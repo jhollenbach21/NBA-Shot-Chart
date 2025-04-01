@@ -5,3 +5,4 @@ plotly
 gunicorn
 scipy
 pillow
+SQLAlchemy
