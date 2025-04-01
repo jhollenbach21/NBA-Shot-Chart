@@ -6,3 +6,4 @@ gunicorn
 scipy
 pillow
 SQLAlchemy
+psycopg2
