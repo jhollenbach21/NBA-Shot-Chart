@@ -325,6 +325,6 @@ def update_player_graph2(value1,value2):
     else:
         return heatmap_by_player(df, value1, value2)
 
-port = int(os.getenv('port')
+port = int(os.getenv('port'))
 app.run(host="0.0.0.0", port=port, debug=False)
 
