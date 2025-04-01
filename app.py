@@ -6,12 +6,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, dcc, Input, Output, callback
 from PIL import Image as PILImage
+from sqlalchemy import create_engine
+import os
 
 def distance(x1, y1, x2, y2):
     return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 def heatmap_by_season(df, season, scale):
-    df_season = df[df['SEASON_2'] == season]
+    df_season = df[df['season'] == season]
     num_boxes = 25
     box_dist = 50/num_boxes
     total_shots = 0
@@ -21,11 +23,11 @@ def heatmap_by_season(df, season, scale):
     make_matrix = np.empty([num_boxes, num_boxes], dtype=float)
     for j in range(num_boxes):
         for i in range(num_boxes):
-            total_shots_at_spot = len(df_season[df_season['LOC_X'].between(-25+i*box_dist, -25+(i+1)*box_dist) &
-                                 df_season['LOC_Y'].between(j*box_dist,(j+1)*box_dist)])
-            current_block = df_season[df_season['LOC_X'].between(-25 + i * box_dist, -25 + (i + 1) * box_dist) &
-                                                df_season['LOC_Y'].between(j * box_dist, (j + 1) * box_dist)]
-            total_makes_at_spot = len(current_block[current_block['SHOT_MADE'] == True])
+            total_shots_at_spot = len(df_season[df_season['loc_x'].between(-25+i*box_dist, -25+(i+1)*box_dist) &
+                                 df_season['loc_y'].between(j*box_dist,(j+1)*box_dist)])
+            current_block = df_season[df_season['loc_x'].between(-25 + i * box_dist, -25 + (i + 1) * box_dist) &
+                                                df_season['loc_y'].between(j * box_dist, (j + 1) * box_dist)]
+            total_makes_at_spot = len(current_block[current_block['shot_made'] == True])
             shot_matrix[j][i]= total_shots_at_spot+1
             if(total_shots_at_spot == 0):
                 make_matrix[j][i] = 0
@@ -103,8 +105,12 @@ def find_marginal(data, l_bound, u_bound, horizontal = True):
         return df
 
 def distance_kde(df, season):
-    df_season = df[df['SEASON_2']== season]
-    shot_distances = df_season['SHOT_DISTANCE']
+    df_season = df[df['season']== season]
+    hoop_location = (0, 4)
+    shot_distances = pd.Series([
+        distance(df_season['loc_x'][i], df_season['loc_y'][i], hoop_location[0], hoop_location[1]) 
+        for i in range(len(df))
+    ])
     marg_dist = find_marginal(shot_distances, 0, 35)
     fig = px.scatter(marg_dist, 'x', 'p_x')
     fig.data[0].update(mode='lines')
@@ -122,7 +128,7 @@ def distance_kde(df, season):
     return fig
 
 def heatmap_by_player(df, player_name, scale):
-    df_player = df[df['PLAYER_NAME'] == player_name]
+    df_player = df[df['player_name'] == player_name]
     num_boxes = 25
     box_dist = 50/num_boxes
     total_shots = 0
@@ -131,11 +137,11 @@ def heatmap_by_player(df, player_name, scale):
     make_matrix = np.empty([num_boxes, num_boxes], dtype=float)
     for j in range(num_boxes):
         for i in range(num_boxes):
-            total_shots_at_spot = len(df_player[df_player['LOC_X'].between(-25+i*box_dist, -25+(i+1)*box_dist) &
-                                 df_player['LOC_Y'].between(j*box_dist,(j+1)*box_dist)])
-            current_block = df_player[df_player['LOC_X'].between(-25 + i * box_dist, -25 + (i + 1) * box_dist) &
-                                                df_player['LOC_Y'].between(j * box_dist, (j + 1) * box_dist)]
-            total_makes_at_spot = len(current_block[current_block['SHOT_MADE'] == True])
+            total_shots_at_spot = len(df_player[df_player['loc_x'].between(-25+i*box_dist, -25+(i+1)*box_dist) &
+                                 df_player['loc_y'].between(j*box_dist,(j+1)*box_dist)])
+            current_block = df_player[df_player['loc_x'].between(-25 + i * box_dist, -25 + (i + 1) * box_dist) &
+                                                df_player['loc_y'].between(j * box_dist, (j + 1) * box_dist)]
+            total_makes_at_spot = len(current_block[current_block['shot_made'] == True])
             shot_matrix[j][i]= total_shots_at_spot + 1
             if(total_shots_at_spot == 0):
                 make_matrix[j][i] = 0
@@ -194,8 +200,17 @@ def heatmap_by_player(df, player_name, scale):
     
     return fig
 
-df = pd.read_csv('NBA_2004_2024_Shots.csv')
+database_type = os.getenv('db_type')  # e.g., 'mysql', 'sqlite'
+db_username = os.getenv('db_username')
+db_password = os.getenv('db_password')
+db_host = os.getenv('db_host')
+db_port = os.getenv('db_port')
+db_name = os.getenv('db_name')
 
+engine = create_engine(f'{database_type}://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}',pool_pre_ping=True)
+
+query = "SELECT * FROM basketball_shots"
+df = pd.read_sql(query, engine)
 
 app = Dash(__name__)
 
@@ -203,11 +218,11 @@ app.layout = app.layout = dash.html.Div(className='row', children=[
     dash.html.H1("Basketball Shot Data"),
     dash.html.H1("Year Comparison", style={'text-align': 'center'}),
     dash.html.Div(children=[
-        dcc.Dropdown(df['SEASON_2'].unique(), id='years_dropdown_1', style={'display': 'inline-block', 'width': '45%',
+        dcc.Dropdown(df['season'].unique(), id='years_dropdown_1', style={'display': 'inline-block', 'width': '45%',
                                                                         'margin-left': '9%', 'margin-right': '-12%'}),
         dcc.Dropdown(['None', 'Log', 'Sqrt'], id='scale_dropdown_1', style={'display': 'inline-block', 'width': '35%',
                                                                           'margin-right': '-14%'}),
-        dcc.Dropdown(df['SEASON_2'].unique(), id='years_dropdown_2', style={'display': 'inline-block', 'width': '45%',
+        dcc.Dropdown(df['season'].unique(), id='years_dropdown_2', style={'display': 'inline-block', 'width': '45%',
                                                                         'margin-right': '-12%'}),
         dcc.Graph(id='year_graph_1', style={'display': 'inline-block', 'width': '48%'}, figure=heatmap_by_season(df, '2003-04', 'Log')),
         dcc.Graph(id='year_graph_2', style={'display': 'inline-block', 'width': '48%'}, figure=heatmap_by_season(df, '2023-24', 'Log'))
@@ -218,11 +233,11 @@ app.layout = app.layout = dash.html.Div(className='row', children=[
     ]),
     dash.html.H1("Player Comparison", style={'text-align': 'center'}),
     dash.html.Div(children=[
-        dcc.Dropdown(df['PLAYER_NAME'].unique(), id='players_dropdown_1', style={'display': 'inline-block', 'width': '45%',
+        dcc.Dropdown(df['player_name'].unique(), id='players_dropdown_1', style={'display': 'inline-block', 'width': '45%',
                                                                         'margin-left': '9%', 'margin-right': '-12%'}),
         dcc.Dropdown(['None', 'Log', 'Sqrt'], id='scale_dropdown_2', style={'display': 'inline-block', 'width': '35%',
                                                                           'margin-right': '-14%'}),
-        dcc.Dropdown(df['PLAYER_NAME'].unique(), id='players_dropdown_2', style={'display': 'inline-block', 'width': '45%',
+        dcc.Dropdown(df['player_name'].unique(), id='players_dropdown_2', style={'display': 'inline-block', 'width': '45%',
                                                                         'margin-right': '-12%'}),
         dcc.Graph(id='player_graph_1', style={'display': 'inline-block', 'width': '48%'}, figure=heatmap_by_player(df,'Kyle Korver','Log')),
         dcc.Graph(id='player_graph_2', style={'display': 'inline-block', 'width': '48%'}, figure=heatmap_by_player(df,'LeBron James','Log'))
@@ -311,4 +326,5 @@ def update_player_graph2(value1,value2):
         return heatmap_by_player(df, value1, value2)
 
 
-app.run_server(debug = False)
+app.run(debug = False)
+
