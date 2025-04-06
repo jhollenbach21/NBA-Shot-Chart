@@ -15,6 +15,7 @@ def distance(x1, y1, x2, y2):
 def heatmap_by_season(season, scale, engine):
     sqlquery = "SELECT loc_x, loc_y, shot_made FROM basketball_shots WHERE season = '"+ season + "'"
     df_season = pd.read_sql(sqlquery, engine)
+    print(f"Data for graph: {df_season.head()}")
     num_boxes = 25
     box_dist = 50/num_boxes
     total_shots = 0
