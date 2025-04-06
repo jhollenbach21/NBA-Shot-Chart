@@ -202,6 +202,8 @@ def heatmap_by_player(player_name, scale, engine):
     
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
+
+    fig = go.Figure(data=go.Heatmap(z=[[1, 2], [3, 4]]))
     
     return fig
 
