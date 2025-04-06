@@ -133,6 +133,7 @@ def distance_kde(season, engine):
 def heatmap_by_player(player_name, scale, engine):
     sql_query = "SELECT loc_x, loc_y, shot_made FROM basketball_shots WHERE player_name = '"+ player_name + "'"
     df_player = pd.read_sql(sql_query, engine)
+    print(f"Data for graph: {df_player.head()}")
     num_boxes = 25
     box_dist = 50/num_boxes
     total_shots = 0
@@ -338,4 +339,4 @@ def update_player_graph2(value1,value2):
         return heatmap_by_player(value1, value2, engine)
 
 port = int(os.getenv('port', 4000))
-app.run(host="0.0.0.0", port=port, debug=False)
+app.run(host="0.0.0.0", port=port, debug=True)
